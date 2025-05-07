@@ -113,6 +113,38 @@ namespace Apache.Arrow
             }
 
             /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public TBuilder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                ValidityBuffer.Set(index, false);
+                // Clear the bytes in the value buffer for this index
+                var view = BinaryViews.Span[index];
+                if (!view.IsInline)
+                {
+                    // For non-inline data, clear the bytes in the data buffer
+                    for (int i = view.BufferOffset; i < view.BufferOffset + view.Length; i++)
+                    {
+                        ValueBuffer.Set(i, 0);
+                    }
+                }
+                else
+                {
+                    // For inline data, clear the bytes in the view buffer
+                    view = new BinaryView(new byte[0]);
+                    BinaryViews.Span[index] = view;
+                }
+                return Instance;
+            }
+
+            /// <summary>
             /// Appends a value, consisting of a single byte, to the array.
             /// </summary>
             /// <param name="value">Byte value to append.</param>

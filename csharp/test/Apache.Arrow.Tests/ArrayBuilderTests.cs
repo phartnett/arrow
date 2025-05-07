@@ -74,6 +74,39 @@ namespace Apache.Arrow.Tests
                 where TBuilder : PrimitiveArrayBuilder<T, TArray, TBuilder>, new() =>
                 TestArrayBuilder<TArray, TBuilder>(x => x.Append(T.CreateChecked(123)).AppendNull().AppendNull().Append(T.CreateChecked(127)), 4, 2, 0x09);
         }
+
+        [Fact]
+        public void PrimitiveArrayBuildersSetNullWorksCorrectly()
+        {
+            Test<sbyte, Int8Array, Int8Array.Builder>();
+            Test<short, Int16Array, Int16Array.Builder>();
+            Test<int, Int32Array, Int32Array.Builder>();
+            Test<long, Int64Array, Int64Array.Builder>();
+            Test<byte, UInt8Array, UInt8Array.Builder>();
+            Test<ushort, UInt16Array, UInt16Array.Builder>();
+            Test<uint, UInt32Array, UInt32Array.Builder>();
+            Test<ulong, UInt64Array, UInt64Array.Builder>();
+            Test<Half, HalfFloatArray, HalfFloatArray.Builder>();
+            Test<float, FloatArray, FloatArray.Builder>();
+            Test<double, DoubleArray, DoubleArray.Builder>();
+
+            static void Test<T, TArray, TBuilder>()
+                where T : struct, INumber<T>
+                where TArray : PrimitiveArray<T>
+                where TBuilder : PrimitiveArrayBuilder<T, TArray, TBuilder>, new()
+            {
+                var builder = new TBuilder();
+                builder.Append(T.CreateChecked(123));
+                builder.SetNull(1);
+                builder.Append(T.CreateChecked(127));
+                var array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+            }
+        }
 #endif
 
         [Fact]
@@ -452,5 +485,698 @@ namespace Apache.Arrow.Tests
             return array;
         }
 
+        public class SetNullTests
+        {
+            [Fact]
+            public void PrimitiveArraySetNull()
+            {
+                Test<sbyte, Int8Array, Int8Array.Builder>();
+                Test<short, Int16Array, Int16Array.Builder>();
+                Test<int, Int32Array, Int32Array.Builder>();
+                Test<long, Int64Array, Int64Array.Builder>();
+                Test<byte, UInt8Array, UInt8Array.Builder>();
+                Test<ushort, UInt16Array, UInt16Array.Builder>();
+                Test<uint, UInt32Array, UInt32Array.Builder>();
+                Test<ulong, UInt64Array, UInt64Array.Builder>();
+                Test<Half, HalfFloatArray, HalfFloatArray.Builder>();
+                Test<float, FloatArray, FloatArray.Builder>();
+                Test<double, DoubleArray, DoubleArray.Builder>();
+
+                static void Test<T, TArray, TBuilder>()
+                    where T : struct, INumber<T>
+                    where TArray : PrimitiveArray<T>
+                    where TBuilder : PrimitiveArrayBuilder<T, TArray, TBuilder>, new()
+                {
+                    var builder = new TBuilder();
+                    builder.Append(T.CreateChecked(123));
+                    builder.Append(T.CreateChecked(456));
+                    builder.Append(T.CreateChecked(789));
+
+                    // Test setting middle value to null
+                    builder.SetNull(1);
+                    var array = builder.Build();
+                    Assert.Equal(3, array.Length);
+                    Assert.Equal(1, array.NullCount);
+                    Assert.True(array.IsValid(0));
+                    Assert.False(array.IsValid(1));
+                    Assert.True(array.IsValid(2));
+
+                    // Test setting first value to null
+                    builder = new TBuilder();
+                    builder.Append(T.CreateChecked(123));
+                    builder.Append(T.CreateChecked(456));
+                    builder.Append(T.CreateChecked(789));
+                    builder.SetNull(0);
+                    array = builder.Build();
+                    Assert.Equal(3, array.Length);
+                    Assert.Equal(1, array.NullCount);
+                    Assert.False(array.IsValid(0));
+                    Assert.True(array.IsValid(1));
+                    Assert.True(array.IsValid(2));
+
+                    // Test setting last value to null
+                    builder = new TBuilder();
+                    builder.Append(T.CreateChecked(123));
+                    builder.Append(T.CreateChecked(456));
+                    builder.Append(T.CreateChecked(789));
+                    builder.SetNull(2);
+                    array = builder.Build();
+                    Assert.Equal(3, array.Length);
+                    Assert.Equal(1, array.NullCount);
+                    Assert.True(array.IsValid(0));
+                    Assert.True(array.IsValid(1));
+                    Assert.False(array.IsValid(2));
+
+                    // Test setting multiple values to null
+                    builder = new TBuilder();
+                    builder.Append(T.CreateChecked(123));
+                    builder.Append(T.CreateChecked(456));
+                    builder.Append(T.CreateChecked(789));
+                    builder.SetNull(0);
+                    builder.SetNull(2);
+                    array = builder.Build();
+                    Assert.Equal(3, array.Length);
+                    Assert.Equal(2, array.NullCount);
+                    Assert.False(array.IsValid(0));
+                    Assert.True(array.IsValid(1));
+                    Assert.False(array.IsValid(2));
+
+                    // Test setting all values to null
+                    builder = new TBuilder();
+                    builder.Append(T.CreateChecked(123));
+                    builder.Append(T.CreateChecked(456));
+                    builder.Append(T.CreateChecked(789));
+                    builder.SetNull(0);
+                    builder.SetNull(1);
+                    builder.SetNull(2);
+                    array = builder.Build();
+                    Assert.Equal(3, array.Length);
+                    Assert.Equal(3, array.NullCount);
+                    Assert.False(array.IsValid(0));
+                    Assert.False(array.IsValid(1));
+                    Assert.False(array.IsValid(2));
+
+                    // Test setting null at invalid index
+                    builder = new TBuilder();
+                    builder.Append(T.CreateChecked(123));
+                    Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(-1));
+                    Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(1));
+                }
+            }
+
+            [Fact]
+            public void BooleanArraySetNull()
+            {
+                var builder = new BooleanArray.Builder();
+                builder.Append(true);
+                builder.Append(false);
+                builder.Append(true);
+
+                // Test setting middle value to null
+                builder.SetNull(1);
+                var array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting first value to null
+                builder = new BooleanArray.Builder();
+                builder.Append(true);
+                builder.Append(false);
+                builder.Append(true);
+                builder.SetNull(0);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting last value to null
+                builder = new BooleanArray.Builder();
+                builder.Append(true);
+                builder.Append(false);
+                builder.Append(true);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting multiple values to null
+                builder = new BooleanArray.Builder();
+                builder.Append(true);
+                builder.Append(false);
+                builder.Append(true);
+                builder.SetNull(0);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(2, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting all values to null
+                builder = new BooleanArray.Builder();
+                builder.Append(true);
+                builder.Append(false);
+                builder.Append(true);
+                builder.SetNull(0);
+                builder.SetNull(1);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(3, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting null at invalid index
+                builder = new BooleanArray.Builder();
+                builder.Append(true);
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(-1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(1));
+            }
+
+            [Fact]
+            public void StringArraySetNull()
+            {
+                var builder = new StringArray.Builder();
+                builder.Append("123");
+                builder.Append("456");
+                builder.Append("789");
+
+                // Test setting middle value to null
+                builder.SetNull(1);
+                var array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting first value to null
+                builder = new StringArray.Builder();
+                builder.Append("123");
+                builder.Append("456");
+                builder.Append("789");
+                builder.SetNull(0);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting last value to null
+                builder = new StringArray.Builder();
+                builder.Append("123");
+                builder.Append("456");
+                builder.Append("789");
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting multiple values to null
+                builder = new StringArray.Builder();
+                builder.Append("123");
+                builder.Append("456");
+                builder.Append("789");
+                builder.SetNull(0);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(2, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting all values to null
+                builder = new StringArray.Builder();
+                builder.Append("123");
+                builder.Append("456");
+                builder.Append("789");
+                builder.SetNull(0);
+                builder.SetNull(1);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(3, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting null at invalid index
+                builder = new StringArray.Builder();
+                builder.Append("123");
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(-1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(1));
+            }
+
+            [Fact]
+            public void ListArraySetNull()
+            {
+                var builder = new ListArray.Builder(Int64Type.Default);
+                var valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+
+                // Add three lists
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+
+                // Test setting middle value to null
+                builder.SetNull(1);
+                var array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting first value to null
+                builder = new ListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(0);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting last value to null
+                builder = new ListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting multiple values to null
+                builder = new ListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(0);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(2, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting all values to null
+                builder = new ListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(0);
+                builder.SetNull(1);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(3, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting null at invalid index
+                builder = new ListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(-1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(1));
+            }
+
+            [Fact]
+            public void FixedSizeListArraySetNull()
+            {
+                var builder = new FixedSizeListArray.Builder(Int64Type.Default, 2);
+                var valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+
+                // Add three lists
+                builder.Append();
+                valueBuilder.Append(123).Append(124);
+                builder.Append();
+                valueBuilder.Append(456).Append(457);
+                builder.Append();
+                valueBuilder.Append(789).Append(790);
+
+                // Test setting middle value to null
+                builder.SetNull(1);
+                var array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting first value to null
+                builder = new FixedSizeListArray.Builder(Int64Type.Default, 2);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123).Append(124);
+                builder.Append();
+                valueBuilder.Append(456).Append(457);
+                builder.Append();
+                valueBuilder.Append(789).Append(790);
+                builder.SetNull(0);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting last value to null
+                builder = new FixedSizeListArray.Builder(Int64Type.Default, 2);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123).Append(124);
+                builder.Append();
+                valueBuilder.Append(456).Append(457);
+                builder.Append();
+                valueBuilder.Append(789).Append(790);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting multiple values to null
+                builder = new FixedSizeListArray.Builder(Int64Type.Default, 2);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123).Append(124);
+                builder.Append();
+                valueBuilder.Append(456).Append(457);
+                builder.Append();
+                valueBuilder.Append(789).Append(790);
+                builder.SetNull(0);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(2, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting all values to null
+                builder = new FixedSizeListArray.Builder(Int64Type.Default, 2);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123).Append(124);
+                builder.Append();
+                valueBuilder.Append(456).Append(457);
+                builder.Append();
+                valueBuilder.Append(789).Append(790);
+                builder.SetNull(0);
+                builder.SetNull(1);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(3, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting null at invalid index
+                builder = new FixedSizeListArray.Builder(Int64Type.Default, 2);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123).Append(124);
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(-1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(1));
+            }
+
+            [Fact]
+            public void LargeListArraySetNull()
+            {
+                var builder = new LargeListArray.Builder(Int64Type.Default);
+                var valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+
+                // Add three lists
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+
+                // Test setting middle value to null
+                builder.SetNull(1);
+                var array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting first value to null
+                builder = new LargeListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(0);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting last value to null
+                builder = new LargeListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting multiple values to null
+                builder = new LargeListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(0);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(2, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting all values to null
+                builder = new LargeListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(0);
+                builder.SetNull(1);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(3, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting null at invalid index
+                builder = new LargeListArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(-1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(1));
+            }
+
+            [Fact]
+            public void ListViewArraySetNull()
+            {
+                var builder = new ListViewArray.Builder(Int64Type.Default);
+                var valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+
+                // Add three lists
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+
+                // Test setting middle value to null
+                builder.SetNull(1);
+                var array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting first value to null
+                builder = new ListViewArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(0);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.True(array.IsValid(2));
+
+                // Test setting last value to null
+                builder = new ListViewArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(1, array.NullCount);
+                Assert.True(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting multiple values to null
+                builder = new ListViewArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(0);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(2, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.True(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting all values to null
+                builder = new ListViewArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                builder.Append();
+                valueBuilder.Append(456);
+                builder.Append();
+                valueBuilder.Append(789);
+                builder.SetNull(0);
+                builder.SetNull(1);
+                builder.SetNull(2);
+                array = builder.Build();
+                Assert.Equal(3, array.Length);
+                Assert.Equal(3, array.NullCount);
+                Assert.False(array.IsValid(0));
+                Assert.False(array.IsValid(1));
+                Assert.False(array.IsValid(2));
+
+                // Test setting null at invalid index
+                builder = new ListViewArray.Builder(Int64Type.Default);
+                valueBuilder = builder.ValueBuilder as Int64Array.Builder;
+                Assert.NotNull(valueBuilder);
+                builder.Append();
+                valueBuilder.Append(123);
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(-1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => builder.SetNull(1));
+            }
+        }
     }
 }

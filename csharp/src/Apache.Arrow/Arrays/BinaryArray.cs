@@ -72,7 +72,7 @@ namespace Apache.Arrow
                 //
                 // The offsets buffer contains length + 1 signed integers (either 32-bit or 64-bit, depending on the
                 // logical type), which encode the start position of each slot in the data buffer. The length of the
-                // value in each slot is computed using the difference between the offset at that slot’s index and the
+                // value in each slot is computed using the difference between the offset at that slot's index and the
                 // subsequent offset.
                 //
                 // In this builder, we choose to append the first offset (zero) upon construction, and each trailing
@@ -120,6 +120,37 @@ namespace Apache.Arrow
                 // Note that we do not need to increment the offset as a result.
                 ValidityBuffer.Append(false);
                 ValueOffsets.Append(Offset);
+                return Instance;
+            }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public TBuilder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                // Set the validity buffer to false at the given index
+                ValidityBuffer.Set(index, false);
+
+                // Set the value buffer to an empty byte array at the given index
+                int startOffset = ValueOffsets[index];
+                int endOffset = ValueOffsets[index + 1];
+                int length = endOffset - startOffset;
+                if (length > 0)
+                {
+                    // Clear the bytes in the value buffer for this index
+                    for (int i = startOffset; i < endOffset; i++)
+                    {
+                        ValueBuffer.Set(i, 0);
+                    }
+                }
+
                 return Instance;
             }
 

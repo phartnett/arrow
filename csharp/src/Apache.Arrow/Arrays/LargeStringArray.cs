@@ -110,4 +110,48 @@ public class LargeStringArray: LargeBinaryArray, IReadOnlyList<string>, ICollect
             array[destIndex] = GetString(srcIndex);
         }
     }
+
+    public new class Builder : LargeBinaryArray.Builder
+    {
+        public Builder() : base(LargeStringType.Default) { }
+
+        protected override LargeStringArray Build(ArrayData data)
+        {
+            return new LargeStringArray(data);
+        }
+
+        public Builder Append(string value, Encoding encoding = null)
+        {
+            if (value == null)
+            {
+                return AppendNull();
+            }
+            encoding = encoding ?? DefaultEncoding;
+            byte[] span = encoding.GetBytes(value);
+            return Append(span.AsSpan());
+        }
+
+        /// <summary>
+        /// Sets the value at the specified index to null.
+        /// </summary>
+        /// <param name="index">The index to set to null.</param>
+        /// <returns>Returns the builder (for fluent-style composition).</returns>
+        public Builder SetNull(int index)
+        {
+            if (index < 0 || index >= Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            ValidityBuffer.Set(index, false);
+            // Clear the bytes in the value buffer for this index
+            long startOffset = ValueOffsetsBuffer.Span.CastTo<long>()[index];
+            long endOffset = ValueOffsetsBuffer.Span.CastTo<long>()[index + 1];
+            for (long i = startOffset; i < endOffset; i++)
+            {
+                ValueBuffer.Set((int)i, 0);
+            }
+            return this;
+        }
+    }
 }

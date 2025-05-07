@@ -57,5 +57,63 @@ namespace Apache.Arrow
         }
 
         public override void Accept(IArrowArrayVisitor visitor) => Accept(this, visitor);
+
+        public new class Builder : IArrowArrayBuilder<DictionaryArray, Builder>
+        {
+            public IArrowArrayBuilder<IArrowArray, IArrowArrayBuilder<IArrowArray>> IndicesBuilder { get; }
+            public IArrowArray Dictionary { get; }
+
+            public int Length => IndicesBuilder.Length;
+
+            public int NullCount => IndicesBuilder.NullCount;
+
+            public DictionaryType DataType { get; }
+
+            public Builder(DictionaryType dataType, IArrowArrayBuilder<IArrowArray, IArrowArrayBuilder<IArrowArray>> indicesBuilder, IArrowArray dictionary)
+            {
+                DataType = dataType;
+                IndicesBuilder = indicesBuilder;
+                Dictionary = dictionary;
+            }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                IndicesBuilder.SetNull(index);
+                return this;
+            }
+
+            public DictionaryArray Build(MemoryAllocator allocator = default)
+            {
+                return new DictionaryArray(DataType, IndicesBuilder.Build(allocator), Dictionary);
+            }
+
+            public Builder Reserve(int capacity)
+            {
+                IndicesBuilder.Reserve(capacity);
+                return this;
+            }
+
+            public Builder Resize(int length)
+            {
+                IndicesBuilder.Resize(length);
+                return this;
+            }
+
+            public Builder Clear()
+            {
+                IndicesBuilder.Clear();
+                return this;
+            }
+        }
     }
 }

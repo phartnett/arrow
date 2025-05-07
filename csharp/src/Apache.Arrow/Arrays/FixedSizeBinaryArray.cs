@@ -105,6 +105,27 @@ namespace Apache.Arrow.Arrays
                 ValidityBuffer = new ArrowBuffer.BitmapBuilder();
             }
 
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public TBuilder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                ValidityBuffer.Set(index, false);
+                // Clear the bytes in the value buffer for this index
+                for (int i = 0; i < ByteWidth; i++)
+                {
+                    ValueBuffer.Set(index * ByteWidth + i, 0);
+                }
+                return Instance;
+            }
+
             public TArray Build(MemoryAllocator allocator = default)
             {
                 var bufs = new[]
@@ -184,8 +205,10 @@ namespace Apache.Arrow.Arrays
 
             public TBuilder AppendNull()
             {
-                ValueBuffer.Append(new byte[ByteWidth]);
+                // Do not add to the value buffer in the case of a null.
+                // Note that we do not need to increment the offset as a result.
                 ValidityBuffer.Append(false);
+                ValueBuffer.AppendRange(new byte[ByteWidth]);
                 return Instance;
             }
 
@@ -220,18 +243,6 @@ namespace Apache.Arrow.Arrays
                 }
 
                 ValidityBuffer.Set(index, true);
-                return Instance;
-            }
-
-            public TBuilder SetNull(int index)
-            {
-                int startIndex = index * ByteWidth;
-                for (int i = 0; i < ByteWidth; i++)
-                {
-                    ValueBuffer.Span[startIndex + i] = 0;
-                }
-
-                ValidityBuffer.Set(index, false);
                 return Instance;
             }
         }

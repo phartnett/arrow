@@ -117,5 +117,51 @@ namespace Apache.Arrow
             }
             return result;
         }
+
+        public abstract class Builder : IArrowArrayBuilder<UnionArray, Builder>
+        {
+            protected readonly ArrowBuffer.BitmapBuilder _validityBufferBuilder;
+            protected readonly ArrowBuffer.Builder<byte> _typeIdsBuilder;
+            protected readonly IArrowArrayBuilder<IArrowArray, IArrowArrayBuilder<IArrowArray>>[] _fieldBuilders;
+            protected int _length;
+            protected int _nullCount;
+
+            public Builder(IArrowType dataType)
+            {
+                _validityBufferBuilder = new ArrowBuffer.BitmapBuilder();
+                _typeIdsBuilder = new ArrowBuffer.Builder<byte>();
+                _fieldBuilders = new IArrowArrayBuilder<IArrowArray, IArrowArrayBuilder<IArrowArray>>[0];
+            }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public virtual Builder SetNull(int index)
+            {
+                if (index < 0 || index >= _length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                // Set the validity buffer to false at the given index
+                _validityBufferBuilder.Set(index, false);
+                _nullCount++;
+
+                // Set all field values to null
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.SetNull(index);
+                }
+
+                return this;
+            }
+
+            public abstract UnionArray Build(MemoryAllocator allocator = default);
+            public abstract Builder Reserve(int capacity);
+            public abstract Builder Resize(int length);
+            public abstract Builder Clear();
+        }
     }
 }

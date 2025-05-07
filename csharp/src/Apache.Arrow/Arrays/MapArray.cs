@@ -64,9 +64,38 @@ namespace Apache.Arrow
 
             public Builder AppendNull()
             {
-                ValueOffsetsBufferBuilder.Append(KeyBuilder.Length);
+                ValueOffsetsBufferBuilder.Append(ValueBuilder.Length);
                 ValidityBufferBuilder.Append(false);
                 NullCount++;
+
+                return this;
+            }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                // Set the validity buffer to false at the given index
+                ValidityBufferBuilder.Set(index, false);
+
+                // Update the value offsets buffer to maintain consistency
+                int startOffset = ValueOffsetsBufferBuilder.Span[index];
+                int endOffset = ValueOffsetsBufferBuilder.Span[index + 1];
+                int length = endOffset - startOffset;
+
+                // Clear the values in the value builder for this index
+                for (int i = 0; i < length; i++)
+                {
+                    ValueBuilder.SetNull(startOffset + i);
+                }
 
                 return this;
             }

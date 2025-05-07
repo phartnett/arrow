@@ -48,6 +48,29 @@ namespace Apache.Arrow
                 return Append(span.AsSpan());
             }
 
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                ValidityBuffer.Set(index, false);
+                // Clear the bytes in the value buffer for this index
+                int startOffset = ValueOffsetsBuffer.Span.CastTo<int>()[index];
+                int endOffset = ValueOffsetsBuffer.Span.CastTo<int>()[index + 1];
+                for (int i = startOffset; i < endOffset; i++)
+                {
+                    ValueBuffer.Set(i, 0);
+                }
+                return this;
+            }
+
             public Builder AppendRange(IEnumerable<string> values, Encoding encoding = null)
             {
                 foreach (string value in values)

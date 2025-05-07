@@ -70,6 +70,21 @@ namespace Apache.Arrow
                 _length = length;
                 return this;
             }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                return this;
+            }
         }
 
         public ArrayData Data { get; }

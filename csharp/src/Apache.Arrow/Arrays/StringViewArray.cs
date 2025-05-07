@@ -55,6 +55,38 @@ namespace Apache.Arrow
 
                 return this;
             }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                ValidityBuffer.Set(index, false);
+                // Clear the bytes in the value buffer for this index
+                var view = ValueBuffer.Span.CastTo<BinaryView>()[index];
+                if (!view.IsInline)
+                {
+                    // For non-inline data, clear the bytes in the data buffer
+                    for (int i = view.Offset; i < view.Offset + view.Length; i++)
+                    {
+                        DataBuffers[view.BufferIndex].Set(i, 0);
+                    }
+                }
+                else
+                {
+                    // For inline data, clear the bytes in the view buffer
+                    view.Length = 0;
+                    ValueBuffer.Span.CastTo<BinaryView>()[index] = view;
+                }
+                return this;
+            }
         }
 
         public StringViewArray(ArrayData data)

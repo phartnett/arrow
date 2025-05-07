@@ -20,6 +20,125 @@ namespace Apache.Arrow
 {
     public class LargeListArray : Array
     {
+        public class Builder : IArrowArrayBuilder<LargeListArray, Builder>
+        {
+            public IArrowArrayBuilder<IArrowArray, IArrowArrayBuilder<IArrowArray>> ValueBuilder { get; }
+
+            public int Length => ValueOffsetsBufferBuilder.Length;
+
+            private ArrowBuffer.Builder<long> ValueOffsetsBufferBuilder { get; }
+
+            private ArrowBuffer.BitmapBuilder ValidityBufferBuilder { get; }
+
+            public int NullCount { get; protected set; }
+
+            private IArrowType DataType { get; }
+
+            public Builder(IArrowType valueDataType) : this(new LargeListType(valueDataType))
+            {
+            }
+
+            public Builder(Field valueField) : this(new LargeListType(valueField))
+            {
+            }
+
+            internal Builder(LargeListType dataType)
+            {
+                ValueBuilder = ArrowArrayBuilderFactory.Build(dataType.ValueDataType);
+                ValueOffsetsBufferBuilder = new ArrowBuffer.Builder<long>();
+                ValidityBufferBuilder = new ArrowBuffer.BitmapBuilder();
+                DataType = dataType;
+            }
+
+            /// <summary>
+            /// Start a new variable-length list slot
+            ///
+            /// This function should be called before beginning to append elements to the
+            /// value builder
+            /// </summary>
+            /// <returns></returns>
+            public Builder Append()
+            {
+                ValueOffsetsBufferBuilder.Append(ValueBuilder.Length);
+                ValidityBufferBuilder.Append(true);
+
+                return this;
+            }
+
+            public Builder AppendNull()
+            {
+                ValueOffsetsBufferBuilder.Append(ValueBuilder.Length);
+                ValidityBufferBuilder.Append(false);
+                NullCount++;
+
+                return this;
+            }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                // Set the validity buffer to false at the given index
+                ValidityBufferBuilder.Set(index, false);
+
+                // Update the value offsets buffer to maintain consistency
+                long startOffset = ValueOffsetsBufferBuilder.Span[index];
+                long endOffset = ValueOffsetsBufferBuilder.Span[index + 1];
+                long length = endOffset - startOffset;
+
+                // Clear the values in the value builder for this index
+                for (long i = 0; i < length; i++)
+                {
+                    ValueBuilder.SetNull((int)(startOffset + i));
+                }
+
+                return this;
+            }
+
+            public LargeListArray Build(MemoryAllocator allocator = default)
+            {
+                ValueOffsetsBufferBuilder.Append(ValueBuilder.Length);
+
+                ArrowBuffer validityBuffer = NullCount > 0
+                                        ? ValidityBufferBuilder.Build(allocator)
+                                        : ArrowBuffer.Empty;
+
+                return new LargeListArray(DataType, Length - 1,
+                    ValueOffsetsBufferBuilder.Build(allocator), ValueBuilder.Build(allocator),
+                    validityBuffer, NullCount, 0);
+            }
+
+            public Builder Reserve(int capacity)
+            {
+                ValueOffsetsBufferBuilder.Reserve(capacity + 1);
+                ValidityBufferBuilder.Reserve(capacity);
+                return this;
+            }
+
+            public Builder Resize(int length)
+            {
+                ValueOffsetsBufferBuilder.Resize(length + 1);
+                ValidityBufferBuilder.Resize(length);
+                return this;
+            }
+
+            public Builder Clear()
+            {
+                ValueOffsetsBufferBuilder.Clear();
+                ValueBuilder.Clear();
+                ValidityBufferBuilder.Clear();
+                return this;
+            }
+        }
+
         public IArrowArray Values { get; }
 
         public ArrowBuffer ValueOffsetsBuffer => Data.Buffers[1];

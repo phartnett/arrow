@@ -179,6 +179,13 @@ namespace Apache.Arrow
             return Instance;
         }
 
+        public TBuilder SetNull(int index)
+        {
+            ValidityBuffer.Set(index, false);
+            ValueBuffer.Span[index] = default(T);
+            return Instance;
+        }
+
         public TBuilder Swap(int i, int j)
         {
             T x = ValueBuffer.Span[i];

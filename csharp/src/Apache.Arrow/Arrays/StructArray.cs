@@ -82,5 +82,108 @@ namespace Apache.Arrow
             Fields[((StructType)Data.DataType).GetFieldIndex(columnName, comparer)];
 
         IArrowArray IArrowRecord.Column(int columnIndex) => Fields[columnIndex];
+
+        public class Builder : IArrowArrayBuilder<StructArray, Builder>
+        {
+            private readonly IArrowType _dataType;
+            private readonly IArrowArrayBuilder<IArrowArray, IArrowArrayBuilder<IArrowArray>>[] _fieldBuilders;
+            private readonly ArrowBuffer.BitmapBuilder _validityBufferBuilder;
+            private int _length;
+            private int _nullCount;
+
+            public Builder(IArrowType dataType)
+            {
+                _dataType = dataType;
+                _fieldBuilders = new IArrowArrayBuilder<IArrowArray, IArrowArrayBuilder<IArrowArray>>[0];
+                _validityBufferBuilder = new ArrowBuffer.BitmapBuilder();
+            }
+
+            public Builder Append()
+            {
+                _validityBufferBuilder.Append(true);
+                _length++;
+                return this;
+            }
+
+            public Builder AppendNull()
+            {
+                _validityBufferBuilder.Append(false);
+                _nullCount++;
+                _length++;
+                return this;
+            }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder SetNull(int index)
+            {
+                if (index < 0 || index >= _length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                // Set the validity buffer to false at the given index
+                _validityBufferBuilder.Set(index, false);
+
+                // Set all field values to null
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.SetNull(index);
+                }
+
+                return this;
+            }
+
+            public StructArray Build(MemoryAllocator allocator = default)
+            {
+                ArrowBuffer validityBuffer = _nullCount > 0
+                    ? _validityBufferBuilder.Build(allocator)
+                    : ArrowBuffer.Empty;
+
+                var children = new IArrowArray[_fieldBuilders.Length];
+                for (int i = 0; i < _fieldBuilders.Length; i++)
+                {
+                    children[i] = _fieldBuilders[i].Build(allocator);
+                }
+
+                return new StructArray(_dataType, _length, children, validityBuffer, _nullCount);
+            }
+
+            public Builder Reserve(int capacity)
+            {
+                _validityBufferBuilder.Reserve(capacity);
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.Reserve(capacity);
+                }
+                return this;
+            }
+
+            public Builder Resize(int length)
+            {
+                _validityBufferBuilder.Resize(length);
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.Resize(length);
+                }
+                _length = length;
+                return this;
+            }
+
+            public Builder Clear()
+            {
+                _validityBufferBuilder.Clear();
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.Clear();
+                }
+                _length = 0;
+                _nullCount = 0;
+                return this;
+            }
+        }
     }
 }

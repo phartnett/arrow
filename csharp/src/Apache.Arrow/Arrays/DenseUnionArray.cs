@@ -75,5 +75,103 @@ namespace Apache.Arrow
 
             return nullCount;
         }
+
+        public class Builder : UnionArray.Builder
+        {
+            private readonly ArrowBuffer.Builder<int> _valueOffsetsBuilder;
+
+            public Builder(IArrowType dataType) : base(dataType)
+            {
+                _valueOffsetsBuilder = new ArrowBuffer.Builder<int>();
+            }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public override Builder SetNull(int index)
+            {
+                if (index < 0 || index >= _length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                // Set the validity buffer to false at the given index
+                _validityBufferBuilder.Set(index, false);
+                _nullCount++;
+
+                // Set the type ID to the first field type
+                _typeIdsBuilder.Set(index, 0);
+
+                // Set the offset to the current length of the first field
+                _valueOffsetsBuilder.Set(index, _fieldBuilders[0].Length);
+
+                // Set the value to null in the first field
+                _fieldBuilders[0].SetNull(_fieldBuilders[0].Length);
+
+                return this;
+            }
+
+            public override DenseUnionArray Build(MemoryAllocator allocator = default)
+            {
+                var typeIds = _typeIdsBuilder.Build(allocator);
+                var valueOffsets = _valueOffsetsBuilder.Build(allocator);
+                var validityBuffer = _nullCount > 0 ? _validityBufferBuilder.Build(allocator) : ArrowBuffer.Empty;
+
+                var children = new IArrowArray[_fieldBuilders.Length];
+                for (int i = 0; i < _fieldBuilders.Length; i++)
+                {
+                    children[i] = _fieldBuilders[i].Build(allocator);
+                }
+
+                return new DenseUnionArray(
+                    _dataType,
+                    _length,
+                    children,
+                    typeIds,
+                    valueOffsets,
+                    _nullCount);
+            }
+
+            public override Builder Reserve(int capacity)
+            {
+                _validityBufferBuilder.Reserve(capacity);
+                _typeIdsBuilder.Reserve(capacity);
+                _valueOffsetsBuilder.Reserve(capacity);
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.Reserve(capacity);
+                }
+                return this;
+            }
+
+            public override Builder Resize(int length)
+            {
+                _validityBufferBuilder.Resize(length);
+                _typeIdsBuilder.Resize(length);
+                _valueOffsetsBuilder.Resize(length);
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.Resize(length);
+                }
+                _length = length;
+                return this;
+            }
+
+            public override Builder Clear()
+            {
+                _validityBufferBuilder.Clear();
+                _typeIdsBuilder.Clear();
+                _valueOffsetsBuilder.Clear();
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.Clear();
+                }
+                _length = 0;
+                _nullCount = 0;
+                return this;
+            }
+        }
     }
 }

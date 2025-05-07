@@ -67,5 +67,95 @@ namespace Apache.Arrow
 
             return nullCount;
         }
+
+        public class Builder : UnionArray.Builder
+        {
+            public Builder(IArrowType dataType) : base(dataType)
+            {
+            }
+
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public override Builder SetNull(int index)
+            {
+                if (index < 0 || index >= _length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                // Set the validity buffer to false at the given index
+                _validityBufferBuilder.Set(index, false);
+                _nullCount++;
+
+                // Set the type ID to the first field type
+                _typeIdsBuilder.Set(index, 0);
+
+                // Set all field values to null at the same index
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.SetNull(index);
+                }
+
+                return this;
+            }
+
+            public override SparseUnionArray Build(MemoryAllocator allocator = default)
+            {
+                var typeIds = _typeIdsBuilder.Build(allocator);
+                var validityBuffer = _nullCount > 0 ? _validityBufferBuilder.Build(allocator) : ArrowBuffer.Empty;
+
+                var children = new IArrowArray[_fieldBuilders.Length];
+                for (int i = 0; i < _fieldBuilders.Length; i++)
+                {
+                    children[i] = _fieldBuilders[i].Build(allocator);
+                }
+
+                return new SparseUnionArray(
+                    _dataType,
+                    _length,
+                    children,
+                    typeIds,
+                    _nullCount);
+            }
+
+            public override Builder Reserve(int capacity)
+            {
+                _validityBufferBuilder.Reserve(capacity);
+                _typeIdsBuilder.Reserve(capacity);
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.Reserve(capacity);
+                }
+                return this;
+            }
+
+            public override Builder Resize(int length)
+            {
+                _validityBufferBuilder.Resize(length);
+                _typeIdsBuilder.Resize(length);
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.Resize(length);
+                }
+                _length = length;
+                return this;
+            }
+
+            public override Builder Clear()
+            {
+                _validityBufferBuilder.Clear();
+                _typeIdsBuilder.Clear();
+                foreach (var fieldBuilder in _fieldBuilders)
+                {
+                    fieldBuilder.Clear();
+                }
+                _length = 0;
+                _nullCount = 0;
+                return this;
+            }
+        }
     }
 }

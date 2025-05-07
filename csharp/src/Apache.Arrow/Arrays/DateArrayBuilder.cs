@@ -257,6 +257,22 @@ namespace Apache.Arrow
 #endif
 
         /// <summary>
+        /// Set the value of a date in the form of a <see cref="DateTime"/> object at the specified index.
+        /// </summary>
+        /// <remarks>
+        /// The value of <see cref="DateTime.Kind"/> on the input does not have any effect on the behaviour of this
+        /// method.
+        /// </remarks>
+        /// <param name="index">Index at which to set value.</param>
+        /// <param name="value">Date to set.</param>
+        /// <returns>Returns the builder (for fluent-style composition).</returns>
+        public TBuilder SetNull(int index)
+        {
+            InnerBuilder.SetNull(index);
+            return this as TBuilder;
+        }
+
+        /// <summary>
         /// Swap the values of the dates at the specified indices.
         /// </summary>
         /// <param name="i">First index.</param>

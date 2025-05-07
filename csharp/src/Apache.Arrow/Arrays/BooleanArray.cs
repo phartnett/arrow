@@ -143,6 +143,14 @@ namespace Apache.Arrow
                 return this;
             }
 
+            public Builder SetNull(int index)
+            {
+                CheckIndex(index);
+                ValueBuffer.Set(index, false);
+                ValidityBuffer.Unset(index);
+                return this;
+            }
+
             public Builder Swap(int i, int j)
             {
                 CheckIndex(i);

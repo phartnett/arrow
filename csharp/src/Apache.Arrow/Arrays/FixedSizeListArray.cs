@@ -81,6 +81,31 @@ namespace Apache.Arrow
                 return this;
             }
 
+            /// <summary>
+            /// Sets the value at the specified index to null.
+            /// </summary>
+            /// <param name="index">The index to set to null.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                // Set the validity buffer to false at the given index
+                ValidityBufferBuilder.Set(index, false);
+
+                // Set all values in the list to null
+                int startOffset = index * DataType.ListSize;
+                for (int i = 0; i < DataType.ListSize; i++)
+                {
+                    ValueBuilder.SetNull(startOffset + i);
+                }
+
+                return this;
+            }
+
             public FixedSizeListArray Build(MemoryAllocator allocator = default)
             {
                 ValidateChildLength();
