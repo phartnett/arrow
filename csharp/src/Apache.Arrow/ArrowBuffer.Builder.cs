@@ -221,6 +221,39 @@ namespace Apache.Arrow
                 return new ArrowBuffer(memoryOwner);
             }
 
+            /// <summary>
+            /// Set a value at the specified index.
+            /// </summary>
+            /// <param name="index">Index at which to set the value.</param>
+            /// <param name="value">Value to set.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder<T> Set(int index, T value)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                Span[index] = value;
+                return this;
+            }
+
+            /// <summary>
+            /// Set a null value at the specified index.
+            /// </summary>
+            /// <param name="index">Index at which to set the null value.</param>
+            /// <returns>Returns the builder (for fluent-style composition).</returns>
+            public Builder<T> SetNull(int index)
+            {
+                if (index < 0 || index >= Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                Span[index] = default;
+                return this;
+            }
+
             private void EnsureAdditionalCapacity(int additionalCapacity)
             {
                 EnsureCapacity(checked(Length + additionalCapacity));
